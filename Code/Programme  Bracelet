@@ -1,0 +1,43 @@
+//---------------NRF24L01------------------------//
+
+#include <SPI.h>
+#include "printf.h"
+#include "RF24.h"
+
+#define CE_PIN 5
+#define CSN_PIN 6
+
+RF24 radio(CE_PIN, CSN_PIN);
+
+uint8_t address[][6] = { "1Node", "2Node" };
+bool radioNumber = 1;  // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+bool role = false;  // true = TX role, false = RX role
+float payload = 1;
+
+
+void setup() {
+  Serial.begin(9600);
+
+  //Initialisation NRF24L01
+  if (!radio.begin()) {
+    Serial.println(F("radio hardware is not responding!!"));
+    while (1) {}  // hold in infinite loop
+  }
+  radio.setPALevel(RF24_PA_LOW);
+  radio.setPayloadSize(sizeof(payload)); // float datatype occupies 4 bytes
+  radio.openWritingPipe(address[0]);
+  radio.stopListening();  // put radio in RX mode
+}
+
+void loop() {
+
+    bool report = radio.write(&payload, sizeof(float));  // transmit & save the report
+
+    if (report) {
+      Serial.print(F("Transmission successful! "));  // payload was delivered
+      Serial.print(F(" us. Sent: "));
+      Serial.println(payload);  // print payload sent
+    } else {
+      Serial.println(F("Transmission failed or timed out"));  // payload was not delivered
+    }
+}

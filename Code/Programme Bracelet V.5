@@ -1,0 +1,97 @@
+
+
+//---------------NRF24L01------------------------//
+#include <SPI.h>
+#include "printf.h"
+#include "RF24.h"
+
+#define CE_PIN 5
+#define CSN_PIN 6
+
+RF24 radio(CE_PIN, CSN_PIN);
+
+uint8_t address[][6] = { "1Node", "2Node" };
+bool radioNumber = 1;  // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+bool role = false;  // true = TX role, false = RX role
+
+//---------------Accelerometre------------------//
+#include <Wire.h>
+#include <Adafruit_MMA8451.h>
+#include <Adafruit_Sensor.h>
+Adafruit_MMA8451 mma = Adafruit_MMA8451();
+
+//----------------Variables--------------------//
+
+float x=0;  //Valeur d'accélération selon x
+float x_final=0;
+float y=0;  //Valeur d'accélération selon y
+float y_final=0;
+float z=0;  //Valeur d'accélération selon z
+float z_final=0;
+float IndiceMVBracelet=0; //Indice de mouvement du bracelet
+
+
+void setup() {
+
+  //Initialisation PortSerie à une vitesse de 9600 Bauds
+  Serial.begin(9600);
+
+  //Initialisation NRF24L01
+  if (!radio.begin()) {
+    Serial.println(F("radio hardware is not responding!!"));
+    while (1) {}  // hold in infinite loop
+  }
+  radio.setPALevel(RF24_PA_LOW);
+  radio.setPayloadSize(sizeof(IndiceMVBracelet)); // float datatype occupies 4 bytes
+  radio.openWritingPipe(address[0]);
+  radio.stopListening();  // put radio in RX mode
+  //Initialisation Accelerometre
+  if (! mma.begin()) {
+    Serial.println("Couldnt start");
+    while (1);
+  }
+  Serial.println("MMA8451 found!");
+
+  mma.setRange(MMA8451_RANGE_4_G);
+
+  delay(250);
+
+}
+
+void loop() {
+
+  //----------Lecture des valeurs de l'accéléromètre-------------//
+  mma.read();
+  if(abs(mma.x)>(x+200) || abs(mma.x)<(x-200)){
+    x=abs(mma.x);
+    x_final=x_final+(x/83120);
+    IndiceMVBracelet=IndiceMVBracelet+ x_final;
+  }
+  if(abs(mma.y)>(y+200) || abs(mma.y)<(y-200)){
+    y=abs(mma.y);
+    y_final=y_final+(y/83120);
+    IndiceMVBracelet=IndiceMVBracelet+ y_final;
+  }
+  if(abs(mma.z)>(z+200) || abs(mma.z)<(z-200)){
+    z=abs(mma.z);
+    z_final=z_final+(z/83120);
+    IndiceMVBracelet=IndiceMVBracelet+ z_final;
+  }     
+
+  //----------------Envoi des valeurs à la montre--------------//
+  
+  bool report = radio.write(&IndiceMVBracelet, sizeof(float));  // transmit & save the report
+
+  /*
+  if (report) {
+    Serial.print(F("Envoie des données réussis !"));  // payload was delivered
+    Serial.print(F("Valeur Envoyée: "));
+    Serial.println(IndiceMVBracelet);  // print payload sent
+  } else {
+    //Serial.println(F("Problème de communication"));  // payload was not delivered
+  }
+  */
+
+
+}
+
